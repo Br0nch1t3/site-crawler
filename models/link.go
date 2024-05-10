@@ -8,34 +8,41 @@ import (
 )
 
 type Link struct {
+	XMLName xml.Name
+	Href    *url.URL
+	Text    string
+}
+
+type linkXmlAdapter struct {
 	XMLName xml.Name `xml:"url"`
 	Href    string   `xml:"loc"`
-	Text    string   `xml:"-"`
+}
+
+func (l Link) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	adapter := linkXmlAdapter{
+		Href: l.Href.String(),
+	}
+
+	return e.Encode(adapter)
 }
 
 func (l Link) String() string {
-	return fmt.Sprintf("{\"href\": \"%s\", \"text\": \"%s\"}", l.Href, l.Text)
+	return fmt.Sprintf("{\"href\": \"%s\", \"text\": \"%s\"}", l.Href.String(), l.Text)
 }
 
-func (l Link) SamePath(link Link) bool {
-	parsedBaseLink, err := url.Parse(l.Href)
-
-	if err != nil {
-		return false
-	}
-
-	parsedLink, err := url.Parse(link.Href)
-
-	if err != nil {
-		return false
-	}
-
-	return strings.Trim(parsedBaseLink.Path, "/") == strings.Trim(parsedLink.Path, "/")
+func (l Link) SameHref(link Link) bool {
+	return strings.Trim(l.Href.String(), "/") == strings.Trim(link.Href.String(), "/")
 }
 
-type xmlArrayWrapper[T fmt.Stringer] struct {
-	XMLName xml.Name `xml:"urlset"`
+type linkArrayXmlAdapter[T fmt.Stringer] struct {
+	XMLName xml.Name `xml:"http://www.sitemaps.org/schemas/sitemap/0.9 urlset"`
 	Content []T
+}
+
+func (r Array[T]) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	adapter := linkArrayXmlAdapter[T]{Content: []T(r)}
+
+	return e.Encode(adapter)
 }
 
 func (arr Array[Link]) String() string {
@@ -46,10 +53,4 @@ func (arr Array[Link]) String() string {
 	}
 
 	return fmt.Sprintf("[%s]", strings.Join(res, ","))
-}
-
-func (r Array[T]) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	wrapper := xmlArrayWrapper[T]{Content: []T(r)}
-
-	return e.Encode(wrapper)
 }

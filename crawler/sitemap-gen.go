@@ -2,25 +2,26 @@ package crawler
 
 import (
 	"crawler/models"
+	utilsxml "crawler/utils/xml"
 	"encoding/xml"
 	"net/url"
 	"slices"
 	"sync"
 )
 
-func SitemapGenerator(href string) ([]byte, error) {
+func SitemapGenerator(uri *url.URL) ([]byte, error) {
 	links := &models.Array[models.Link]{}
 	mu := sync.Mutex{}
 
-	crawl(links, models.Link{Href: href}, &mu)
+	crawl(links, models.Link{Href: uri}, &mu)
 
-	res, err := xml.Marshal(links)
+	res, err := xml.MarshalIndent(links, "", " ")
 
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
-	return res, nil
+	return utilsxml.WithHeader(res), nil
 }
 
 func crawl(visited *models.Array[models.Link], baseLink models.Link, mu *sync.Mutex) {
@@ -32,21 +33,7 @@ func crawl(visited *models.Array[models.Link], baseLink models.Link, mu *sync.Mu
 
 	wg := sync.WaitGroup{}
 	for _, link := range links {
-		if slices.ContainsFunc(*visited, link.SamePath) {
-			continue
-		}
-
-		parsedBaseLink, err := url.Parse(baseLink.Href)
-		if err != nil {
-			continue
-		}
-
-		parsedLink, err := url.Parse(link.Href)
-		if err != nil {
-			continue
-		}
-
-		if parsedLink.Host != parsedBaseLink.Host && (len(parsedLink.Scheme) > 0 || link.Href[0] == '#') {
+		if slices.ContainsFunc(*visited, link.SameHref) {
 			continue
 		}
 

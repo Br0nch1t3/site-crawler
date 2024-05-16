@@ -1,34 +1,85 @@
 package main
 
 import (
-	"crawler/crawler"
+	"crawler/crawlers"
+	utilsio "crawler/utils/io"
 	utilsurl "crawler/utils/url"
+	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
+	"os/signal"
 )
 
+type Opts struct {
+	Uri    *url.URL
+	Depth  *int
+	Output string
+}
+
 func main() {
-	args := os.Args[1:]
+	signalCh := make(chan os.Signal, 1)
+	opts := parseFlags()
 
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Provide a url like so: ./crawler {url}")
-		os.Exit(1)
-	}
+	signal.Notify(signalCh, os.Interrupt)
 
-	uri, err := url.ParseRequestURI(args[0])
-
-	if err != nil || !utilsurl.IsHttp(uri) {
-		fmt.Fprintln(os.Stderr, "Please provide a valid url")
-		os.Exit(1)
-	}
-
-	res, err := crawler.SitemapGenerator(uri)
+	res, err := crawlers.SiteCrawler(opts.Uri, crawlers.SiteCrawlerOpts{
+		Depth:       *opts.Depth,
+		InterruptCh: signalCh,
+	})
 
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	fmt.Println(string(res))
+	if err := os.WriteFile(opts.Output+".xml", res, 0644); err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Printf("%s written to %s.xml\n", utilsio.GetHumanReadableSize(len(res)), opts.Output)
+}
+
+func parseFlags() *Opts {
+	opts := &Opts{
+		Depth: flag.Int("depth", -1, "Max depth to crawl to"),
+	}
+
+	flag.Func("url", "Url to crawl", urlFlagBuilder(opts))
+	flag.Func("output", "Name of the output file without extension (default: \"sitemap\")", outputFlagBuilder(opts))
+
+	flag.Parse()
+
+	if opts.Uri == nil {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	return opts
+}
+
+func urlFlagBuilder(opts *Opts) func(string) error {
+	return func(flagValue string) error {
+		uri, err := url.ParseRequestURI(flagValue)
+
+		if err != nil || !utilsurl.IsHttp(uri) {
+			return err
+		}
+
+		opts.Uri = uri
+		return nil
+	}
+}
+
+func outputFlagBuilder(opts *Opts) func(string) error {
+	opts.Output = "sitemap"
+
+	return func(flagValue string) error {
+		if flagValue[len(flagValue)-1] == '.' || len(flagValue) == 0 {
+			return errors.New("invalid filename")
+		}
+		opts.Output = flagValue
+
+		return nil
+	}
 }

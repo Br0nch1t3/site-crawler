@@ -1,7 +1,6 @@
 package crawlers
 
 import (
-	"crawler/logger"
 	"crawler/models"
 	utilsurl "crawler/utils/url"
 	utilsxml "crawler/utils/xml"
@@ -17,37 +16,31 @@ import (
 
 type SiteCrawlerOpts struct {
 	Depth       int
-	Verbose     bool
 	InterruptCh chan os.Signal
-	debugLogger *log.Logger
-	errorLogger *log.Logger
+	DebugLogger *log.Logger
+	ErrorLogger *log.Logger
 }
 
 func SiteCrawler(uri *url.URL, opts ...SiteCrawlerOpts) ([]byte, error) {
-	if len(opts) == 0 {
-		opts = []SiteCrawlerOpts{{Depth: -1}}
-	} else if opts[0].Verbose {
-		opts[0].debugLogger = logger.NewDebugLogger()
-		opts[0].errorLogger = logger.NewErrorLogger()
-	}
+	parsedOpts := parseOpts(opts...)
 
 	links := &models.Array[models.Link]{models.Link{Href: uri}}
 	mu := sync.Mutex{}
 
-	crawler := crawlerBuilder(opts[0])
+	crawler := crawlerBuilder(parsedOpts)
 
-	if opts[0].InterruptCh != nil {
+	if parsedOpts.InterruptCh != nil {
 		go func() {
-			<-opts[0].InterruptCh
+			<-parsedOpts.InterruptCh
 			signal.Reset(os.Interrupt)
-			close(opts[0].InterruptCh)
+			close(parsedOpts.InterruptCh)
 			fmt.Fprintln(os.Stderr, "Exiting...")
 		}()
 	}
 
 	if err := crawler(links, (*links)[0], &mu); err != nil {
-		if opts[0].errorLogger != nil {
-			opts[0].errorLogger.Println(err)
+		if parsedOpts.ErrorLogger != nil {
+			parsedOpts.ErrorLogger.Println(err)
 		}
 		return nil, fmt.Errorf(`unable to crawl "%s"`, uri.String())
 	}
@@ -55,8 +48,8 @@ func SiteCrawler(uri *url.URL, opts ...SiteCrawlerOpts) ([]byte, error) {
 	res, err := xml.MarshalIndent(links, "", " ")
 
 	if err != nil {
-		if opts[0].errorLogger != nil {
-			opts[0].errorLogger.Println(err)
+		if parsedOpts.ErrorLogger != nil {
+			parsedOpts.ErrorLogger.Println(err)
 		}
 		return nil, err
 	}
@@ -68,8 +61,8 @@ type CrawlerFn func(*models.Array[models.Link], models.Link, *sync.Mutex) error
 
 func crawlerBuilder(opts SiteCrawlerOpts) CrawlerFn {
 	return func(visited *models.Array[models.Link], baseLink models.Link, mu *sync.Mutex) error {
-		if opts.debugLogger != nil {
-			opts.debugLogger.Printf("crawling %s\n", baseLink.Href)
+		if opts.DebugLogger != nil {
+			opts.DebugLogger.Printf("crawling %s\n", baseLink.Href)
 		}
 		links, err := PageCrawler(baseLink.Href)
 
@@ -107,4 +100,11 @@ func crawlerBuilder(opts SiteCrawlerOpts) CrawlerFn {
 
 func isCrawlable(visited models.Array[models.Link], link models.Link, opts SiteCrawlerOpts) bool {
 	return (opts.Depth == -1 || utilsurl.PathLen(link.Href) <= opts.Depth) && !slices.ContainsFunc(visited, link.SameHref)
+}
+
+func parseOpts(opts ...SiteCrawlerOpts) SiteCrawlerOpts {
+	if len(opts) == 0 {
+		return SiteCrawlerOpts{Depth: -1}
+	}
+	return opts[0]
 }

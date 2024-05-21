@@ -2,6 +2,7 @@ package crawlers
 
 import (
 	"crawler/models"
+	utilshttp "crawler/utils/http"
 	utilsurl "crawler/utils/url"
 	"errors"
 	"log"
@@ -15,9 +16,13 @@ import (
 
 func PageCrawler(uri *url.URL) (models.Array[models.Link], error) {
 	visited := []models.Link{}
-	res, err := http.Get(uri.String())
+	res, redirectErr := http.Get(uri.String())
 
-	if err != nil {
+	if redirectErr != nil {
+		return nil, redirectErr
+	}
+
+	if err := utilshttp.ExtractError(res); err != nil {
 		return nil, err
 	}
 

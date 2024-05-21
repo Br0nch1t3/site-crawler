@@ -3,6 +3,7 @@ package main
 import (
 	"crawler/crawlers"
 	"crawler/logger"
+	utilsflag "crawler/utils/flag"
 	utilsio "crawler/utils/io"
 	utilsurl "crawler/utils/url"
 	"errors"
@@ -17,48 +18,56 @@ import (
 type Opts struct {
 	Uri     *url.URL
 	Depth   int
-	Output  string
-	Verbose *bool
+	Verbose bool
 }
 
 func main() {
-	signalCh := make(chan os.Signal, 1)
 	opts := parseFlags()
 	errorLogger := logger.NewErrorLogger()
 
-	signal.Notify(signalCh, os.Interrupt)
+	InterruptCh := interruptHandler()
 
-	res, err := crawlers.SiteCrawler(opts.Uri, crawlers.SiteCrawlerOpts{
+	siteCrawlerOpts := crawlers.SiteCrawlerOpts{
 		Depth:       opts.Depth,
-		Verbose:     *opts.Verbose,
-		InterruptCh: signalCh,
-	})
+		InterruptCh: InterruptCh,
+	}
+
+	if opts.Verbose {
+		siteCrawlerOpts.DebugLogger = logger.NewDebugLogger()
+		siteCrawlerOpts.ErrorLogger = errorLogger
+	}
+
+	res, err := crawlers.SiteCrawler(opts.Uri, siteCrawlerOpts)
 
 	if err != nil {
 		errorLogger.Fatalln(err)
 	}
 
-	if err := os.WriteFile(opts.Output+".xml", res, 0644); err != nil {
-		errorLogger.Fatalln(err)
-	}
-	fmt.Printf("%s written to %s.xml\n", utilsio.GetHumanReadableSize(len(res)), opts.Output)
+	fmt.Println(string(res))
+	fmt.Fprintf(os.Stderr, "%s written\n", utilsio.GetHumanReadableSize(len(res)))
 }
 
+func interruptHandler() chan os.Signal {
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt)
+
+	return signalCh
+}
+
+// Command line arguments Parsing
 func parseFlags() *Opts {
-	opts := &Opts{
-		Verbose: flag.Bool("verbose", false, "Verbose output (default: false)"),
-	}
+	opts := &Opts{}
 
-	flag.Func("url", "Url to crawl", urlFlagBuilder(opts))
-	flag.Func("output", "Name of the output file without extension (default: \"sitemap\")", outputFlagBuilder(opts))
-	flag.Func("depth", "Max depth to crawl to", depthFlagBuilder(opts))
-
-	flag.Parse()
-
-	if opts.Uri == nil {
-		flag.Usage()
-		os.Exit(1)
-	}
+	utilsflag.Parse(
+		"[OPTIONS] [URL]",
+		[][2]string{
+			utilsflag.NewVar(flag.BoolVar, &opts.Verbose, "verbose", "v", false, "Verbose output"),
+			utilsflag.NewFunc("depth", "d", "Max depth to crawl to", depthFlagBuilder(opts)),
+		},
+		[]utilsflag.LookupFn{
+			urlFlagBuilder(opts),
+		},
+	)
 
 	return opts
 }
@@ -72,19 +81,6 @@ func urlFlagBuilder(opts *Opts) func(string) error {
 		}
 
 		opts.Uri = uri
-		return nil
-	}
-}
-
-func outputFlagBuilder(opts *Opts) func(string) error {
-	opts.Output = "sitemap"
-
-	return func(flagValue string) error {
-		if len(flagValue) == 0 || flagValue[len(flagValue)-1] == '.' {
-			return errors.New("url must be http(s)://[domain]/[path]")
-		}
-		opts.Output = flagValue
-
 		return nil
 	}
 }

@@ -12,9 +12,9 @@ const (
 )
 
 func NewDebugLogger() *log.Logger {
-	return log.New(os.Stdout, "\033[34m[DEBUG] \033[0m", log.Lmsgprefix)
+	return log.New(os.Stderr, "\033[34m[DEBUG] \033[0m", log.Lmsgprefix)
 }
 
 func NewErrorLogger() *log.Logger {
-	return log.New(os.Stdout, "\033[31m[ERROR] \033[0m", log.Lmsgprefix)
+	return log.New(os.Stderr, "\033[31m[ERROR] \033[0m", log.Lmsgprefix)
 }

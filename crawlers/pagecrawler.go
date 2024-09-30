@@ -1,12 +1,12 @@
 package crawlers
 
 import (
+	httpclient "crawler/http-client"
 	"crawler/models"
 	utilshttp "crawler/utils/http"
 	utilsurl "crawler/utils/url"
 	"errors"
 	"log"
-	"net/http"
 	"net/url"
 	"slices"
 	"strings"
@@ -16,7 +16,7 @@ import (
 
 func PageCrawler(uri *url.URL) (models.Array[models.Link], error) {
 	visited := []models.Link{}
-	res, redirectErr := http.Get(uri.String())
+	res, redirectErr := httpclient.Instance().Get(uri.String())
 
 	if redirectErr != nil {
 		return nil, redirectErr
@@ -98,13 +98,14 @@ func parseHref(rawHref string, uri *url.URL, visited []models.Link) (*url.URL, e
 
 	if !href.IsAbs() {
 		if href.String()[0] == '/' {
-			href, err = uri.Parse(href.Path)
+			href, err = uri.Parse(href.EscapedPath())
 
 			if err != nil {
+				log.Println(uri)
 				log.Fatalln(err)
 			}
 		} else {
-			href = uri.JoinPath(href.Path)
+			href = uri.JoinPath(href.EscapedPath())
 		}
 	}
 

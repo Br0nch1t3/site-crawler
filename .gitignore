@@ -1,3 +1,5 @@
 crawler
 *.xml
 go.sum
+__debug*
+tmux.sh

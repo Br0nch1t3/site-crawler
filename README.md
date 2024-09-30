@@ -6,8 +6,8 @@ This program makes use of goroutines to accelerate the crawling process.
 ## Build
 
 ```sh
-cd crawler
-go build .
+make
+./crawler
 ```
 
 ## Usage

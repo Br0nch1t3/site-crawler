@@ -32,6 +32,7 @@ func main() {
 	siteCrawlerOpts := crawlers.SiteCrawlerOpts{
 		Depth:       opts.Depth,
 		InterruptCh: InterruptCh,
+		Expression:  opts.Expression,
 	}
 
 	if opts.Verbose {

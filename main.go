@@ -12,13 +12,15 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"regexp"
 	"strconv"
 )
 
 type Opts struct {
-	Uri     *url.URL
-	Depth   int
-	Verbose bool
+	Uri        *url.URL
+	Depth      int
+	Verbose    bool
+	Expression *regexp.Regexp
 }
 
 func main() {
@@ -63,6 +65,7 @@ func parseFlags() *Opts {
 		[][2]string{
 			utilsflag.NewVar(flag.BoolVar, &opts.Verbose, "verbose", "v", false, "Verbose output"),
 			utilsflag.NewFunc("depth", "d", "Max depth to crawl to", depthFlagBuilder(opts)),
+			utilsflag.NewFunc("expression", "e", "Regular expression urls must match", expressionFlagBuilder(opts)),
 		},
 		[]utilsflag.LookupFn{
 			urlFlagBuilder(opts),
@@ -70,6 +73,19 @@ func parseFlags() *Opts {
 	)
 
 	return opts
+}
+
+func expressionFlagBuilder(opts *Opts) func(string) error {
+	return func(flagValue string) error {
+		re, err := regexp.Compile(flagValue)
+
+		if err != nil {
+			return err
+		}
+
+		opts.Expression = re
+		return nil
+	}
 }
 
 func urlFlagBuilder(opts *Opts) func(string) error {

@@ -6,6 +6,7 @@ import (
 	utilshttp "crawler/utils/http"
 	utilsurl "crawler/utils/url"
 	"errors"
+	"fmt"
 	"log"
 	"net/url"
 	"slices"
@@ -20,6 +21,10 @@ func PageCrawler(uri *url.URL) (models.Array[models.Link], error) {
 
 	if redirectErr != nil {
 		return nil, redirectErr
+	}
+
+	if res == nil {
+		panic(fmt.Sprint("Request to ", uri.String(), " couldn't be resolved."))
 	}
 
 	if err := utilshttp.ExtractError(res); err != nil {
@@ -46,7 +51,7 @@ func PageCrawler(uri *url.URL) (models.Array[models.Link], error) {
 
 		switch tokenType {
 		case html.StartTagToken:
-			if token.Data == "a" && len(token.Attr) > 0 && token.Attr[0].Key == "href" {
+			if token.Data == "a" && slices.IndexFunc(token.Attr, func(attr html.Attribute) bool { return attr.Key == "href" }) != -1 {
 				href, err := parseHref(token.Attr[0].Val, uri, visited)
 
 				if err != nil {

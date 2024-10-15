@@ -14,10 +14,6 @@ func (e Error) Error() string {
 }
 
 func ExtractError(res *http.Response) error {
-	if res == nil {
-		return nil
-	}
-
 	if res.StatusCode >= 400 && res.StatusCode <= 599 {
 		return &Error{res: res}
 	}

@@ -10,12 +10,14 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"regexp"
 	"slices"
 	"sync"
 )
 
 type SiteCrawlerOpts struct {
 	Depth       int
+	Expression  *regexp.Regexp
 	InterruptCh chan os.Signal
 	DebugLogger *log.Logger
 	ErrorLogger *log.Logger
@@ -99,7 +101,9 @@ func crawlerBuilder(opts SiteCrawlerOpts) CrawlerFn {
 }
 
 func isCrawlable(visited models.Array[models.Link], link models.Link, opts SiteCrawlerOpts) bool {
-	return (opts.Depth == -1 || utilsurl.PathLen(link.Href) <= opts.Depth) && !slices.ContainsFunc(visited, link.SameHref)
+	matches := opts.Expression == nil || opts.Expression.Match([]byte(link.Href.String()))
+
+	return matches && (opts.Depth == -1 || utilsurl.PathLen(link.Href) <= opts.Depth) && !slices.ContainsFunc(visited, link.SameHref)
 }
 
 func parseOpts(opts ...SiteCrawlerOpts) SiteCrawlerOpts {

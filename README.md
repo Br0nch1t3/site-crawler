@@ -21,3 +21,4 @@ make
 | -v, --verbose  |  Verbose output | false |
 | -d, --depth value  |  Max depth to crawl to | none |
 | -h, --help | Prints this help message and exit | none |
+| -e, --expression | Regular expression urls must match | none |
